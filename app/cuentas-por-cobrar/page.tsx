@@ -12,6 +12,7 @@ interface Tercero {
   telefono?: string;
   email?: string;
   tipo_tercero?: string;
+  porcentaje_retencion_iva?: number;
 }
 
 export default function CuentasPorCobrarPage() {
@@ -25,6 +26,7 @@ export default function CuentasPorCobrarPage() {
     razon_social: '',
     telefono: '',
     email: '',
+    porcentaje_retencion_iva: 0,
   });
 
   useEffect(() => {
@@ -58,6 +60,7 @@ export default function CuentasPorCobrarPage() {
         telefono: formData.telefono.trim(),
         email: formData.email.trim(),
         tipo_tercero: 'cliente',
+        porcentaje_retencion_iva: Number(formData.porcentaje_retencion_iva),
       };
 
       const { error } = await supabase
@@ -66,7 +69,13 @@ export default function CuentasPorCobrarPage() {
 
       if (error) throw error;
 
-      setFormData({ numero_documento: '', razon_social: '', telefono: '', email: '' });
+      setFormData({
+        numero_documento: '',
+        razon_social: '',
+        telefono: '',
+        email: '',
+        porcentaje_retencion_iva: 0,
+      });
       fetchTerceros();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al guardar el cliente en Supabase.');
@@ -148,6 +157,18 @@ export default function CuentasPorCobrarPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">% Retención de IVA Aplicable</label>
+                <select
+                  value={formData.porcentaje_retencion_iva}
+                  onChange={(e) => setFormData({ ...formData, porcentaje_retencion_iva: Number(e.target.value) })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value={0}>0% (No es agente de retención / Ordinario)</option>
+                  <option value={75}>75% (Retención Estándar - Agente Especial)</option>
+                  <option value={100}>100% (Retención Total)</option>
+                </select>
+              </div>
             </div>
 
             <button
@@ -178,6 +199,7 @@ export default function CuentasPorCobrarPage() {
                   <th className="p-3">Razón Social / Nombre</th>
                   <th className="p-3">Teléfono</th>
                   <th className="p-3">Email</th>
+                  <th className="p-3 text-center">% Ret. IVA</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -189,6 +211,15 @@ export default function CuentasPorCobrarPage() {
                     <td className="p-3 font-medium text-gray-900">{t.razon_social}</td>
                     <td className="p-3 text-gray-600">{t.telefono || '-'}</td>
                     <td className="p-3 text-gray-600">{t.email || '-'}</td>
+                    <td className="p-3 text-center">
+                      <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        t.porcentaje_retencion_iva && t.porcentaje_retencion_iva > 0
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {t.porcentaje_retencion_iva ?? 0}%
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
