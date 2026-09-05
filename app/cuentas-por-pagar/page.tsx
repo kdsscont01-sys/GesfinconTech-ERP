@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { UserPlus, Truck, AlertCircle, RefreshCw, Pencil, Trash2, X, Check } from 'lucide-react';
+import { UserPlus, Truck, AlertCircle, RefreshCw, Pencil, Trash2, X, Check, FileText } from 'lucide-react';
+import Link from 'next/link';
 
 interface Tercero {
   id?: string;
@@ -113,17 +114,10 @@ export default function CuentasPorPagarPage() {
       };
 
       if (editingId) {
-        const { error } = await supabase
-          .from('terceros')
-          .update(payload)
-          .eq('id', editingId);
-
+        const { error } = await supabase.from('terceros').update(payload).eq('id', editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('terceros')
-          .insert([payload]);
-
+        const { error } = await supabase.from('terceros').insert([payload]);
         if (error) throw error;
       }
 
@@ -139,21 +133,32 @@ export default function CuentasPorPagarPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8 text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex justify-between items-center border-b pb-4 border-gray-200">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-gray-200">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Truck className="text-blue-600" size={28} />
-              Cuentas por Pagar
+              Cuentas por Pagar - Gestión de Proveedores
             </h1>
-            <p className="text-sm text-gray-500">Gestión de proveedores y registros de terceros</p>
+            <p className="text-sm text-gray-500">Registro de datos fiscales de terceros para compras y retenciones</p>
           </div>
-          <button
-            onClick={fetchProveedores}
-            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
-            title="Recargar datos"
-          >
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-          </button>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/cuentas-por-pagar/facturas"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition shadow-sm"
+            >
+              <FileText size={18} />
+              Ir al Sub-módulo Facturas
+            </Link>
+
+            <button
+              onClick={fetchProveedores}
+              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition border border-gray-200 bg-white"
+              title="Recargar datos"
+            >
+              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </header>
 
         {errorMsg && (
