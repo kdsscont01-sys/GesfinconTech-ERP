@@ -52,11 +52,11 @@ export default function CuentasPorCobrarPage() {
 
     try {
       const payload = {
-        numero_documento: formData.numero_documento,
-        rif: formData.numero_documento,
-        razon_social: formData.razon_social,
-        telefono: formData.telefono,
-        email: formData.email,
+        numero_documento: formData.numero_documento.trim(),
+        rif: formData.numero_documento.trim(),
+        razon_social: formData.razon_social.trim(),
+        telefono: formData.telefono.trim(),
+        email: formData.email.trim(),
         tipo_tercero: 'cliente',
       };
 
@@ -112,7 +112,7 @@ export default function CuentasPorCobrarPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">RIF / Cédula / Doc. Identidad *</label>
                 <input
-                  placeholder="ej. V-29511414-9 o J-12345678-0"
+                  placeholder="ej. V295114149, J123456780 o 29511414"
                   value={formData.numero_documento}
                   onChange={(e) => setFormData({ ...formData, numero_documento: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -132,7 +132,7 @@ export default function CuentasPorCobrarPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
                 <input
-                  placeholder="0412-0000000"
+                  placeholder="ej. 04121234567"
                   value={formData.telefono}
                   onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
