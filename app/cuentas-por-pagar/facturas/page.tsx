@@ -54,7 +54,7 @@ export default function SubmoduloFacturasPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    tipo_documento: 'factura', // 'factura' | 'nota_credito' | 'nota_debito'
+    tipo_documento: 'factura',
     proveedor_id: '',
     numero_factura: '',
     numero_control: '',
@@ -76,22 +76,34 @@ export default function SubmoduloFacturasPage() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Cargar Proveedores
       const { data: provData, error: provErr } = await supabase
         .from('terceros')
         .select('*')
         .eq('tipo_tercero', 'proveedor');
 
-      if (provErr) throw provErr;
-      if (provData) setProveedores(provData as Tercero[]);
+      if (provErr) throw new Error(`Error Proveedores: ${provErr.message}`);
+      
+      const provs = (provData as Tercero[]) || [];
+      setProveedores(provs);
 
-      // Cargar Facturas / Comprobantes
       const { data: factData, error: factErr } = await supabase
         .from('compras')
-        .select('*, tercero:terceros(*)');
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (!factErr && factData) {
-        setFacturas(factData as any[]);
+      if (factErr) {
+        throw new Error(`Error al leer tabla 'compras': ${factErr.message}`);
+      }
+
+      if (factData) {
+        const facturasConProveedor = factData.map((f: any) => {
+          const provEncontrado = provs.find((p) => p.id === f.tercero_id);
+          return {
+            ...f,
+            tercero: provEncontrado || { razon_social: 'Proveedor no identificado' },
+          };
+        });
+        setFacturas(facturasConProveedor);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al cargar los datos.');
@@ -100,11 +112,9 @@ export default function SubmoduloFacturasPage() {
     }
   }
 
-  // Proveedor seleccionado
   const selectedProveedor = proveedores.find((p) => p.id === form.proveedor_id);
   const pctRetencionIva = selectedProveedor?.porcentaje_retencion_iva ?? 75;
 
-  // Montos dinámicos en Bolívares
   const exentoNum = Number(form.monto_exento) || 0;
   const baseNum = Number(form.base_imponible) || 0;
   const alicuotaNum = Number(form.alicuota_iva) || 16;
@@ -115,7 +125,6 @@ export default function SubmoduloFacturasPage() {
   const montoRetencionBs = (montoIvaBs * pctRetencionIva) / 100;
   const montoNetoPagarBs = montoTotalBs - montoRetencionBs;
 
-  // Formateadores duales (Bs. y USD)
   const fmtBs = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const fmtUSD = (valBs: number) => `$ ${(valBs / tasaBcvNum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -153,9 +162,13 @@ export default function SubmoduloFacturasPage() {
       };
 
       const { error } = await supabase.from('compras').insert([payload]);
-      if (error) throw error;
 
-      setSuccessMsg('Documento registrado exitosamente en el Libro de Compras.');
+      if (error) {
+        throw new Error(`Error en Supabase: ${error.message}`);
+      }
+
+      setSuccessMsg('¡Factura guardada e ingresada al Libro de Compras con éxito!');
+      
       setForm({
         tipo_documento: 'factura',
         proveedor_id: '',
@@ -171,9 +184,9 @@ export default function SubmoduloFacturasPage() {
         alicuota_iva: 16,
       });
 
-      loadData();
+      await loadData();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al guardar el documento de compra.');
+      setErrorMsg(err.message || 'Error inesperado al guardar.');
     } finally {
       setSaving(false);
     }
@@ -183,7 +196,6 @@ export default function SubmoduloFacturasPage() {
     <div className="min-h-screen bg-gray-50 p-6 text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* ENCABEZADO */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-gray-200">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -215,7 +227,7 @@ export default function SubmoduloFacturasPage() {
         {errorMsg && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-center gap-3 text-red-700">
             <AlertCircle size={20} className="shrink-0" />
-            <div className="text-sm">{errorMsg}</div>
+            <div className="text-sm font-medium">{errorMsg}</div>
           </div>
         )}
 
@@ -226,7 +238,6 @@ export default function SubmoduloFacturasPage() {
           </div>
         )}
 
-        {/* FORMULARIO */}
         <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
           <div className="border-b pb-3 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -238,11 +249,7 @@ export default function SubmoduloFacturasPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {/* TIPO DE DOCUMENTO, PROVEEDOR Y TASA BCV */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              
-              {/* OPTIMIZACIÓN: UN SOLO SELECTOR PARA TIPO DE DOCUMENTO */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Tipo de Documento *
@@ -259,7 +266,6 @@ export default function SubmoduloFacturasPage() {
                 </select>
               </div>
 
-              {/* SELECCIÓN DE PROVEEDOR */}
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Proveedor *
@@ -279,7 +285,6 @@ export default function SubmoduloFacturasPage() {
                 </select>
               </div>
 
-              {/* TASA BCV */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Tasa BCV (Bs. / USD) *
@@ -298,7 +303,6 @@ export default function SubmoduloFacturasPage() {
               </div>
             </div>
 
-            {/* DATOS FISCALES DEL COMPROBANTE */}
             <div>
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                 Identificación del Comprobante Fiscal
@@ -372,7 +376,6 @@ export default function SubmoduloFacturasPage() {
               </div>
             </div>
 
-            {/* MONTOS BASE */}
             <div>
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                 Importes de la Operación
@@ -417,56 +420,47 @@ export default function SubmoduloFacturasPage() {
               </div>
             </div>
 
-            {/* OPTIMIZACIÓN: CUADRO RESUMEN FINANCIERO DUAL (Bs. Y $ EN CADA LÍNEA) */}
             <div className="bg-slate-900 text-white p-5 rounded-xl space-y-3">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">
                 Resumen de Cierre Tributario y Financiero (Doble Moneda)
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-mono">
-                
-                {/* Exento */}
                 <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
                   <span className="block text-[11px] text-slate-400 uppercase font-sans">Monto Exento</span>
                   <div className="text-sm font-bold text-slate-200 mt-1">{fmtBs(exentoNum)}</div>
                   <div className="text-xs text-slate-400 font-sans">{fmtUSD(exentoNum)}</div>
                 </div>
 
-                {/* Base Imponible */}
                 <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
                   <span className="block text-[11px] text-slate-400 uppercase font-sans">Base Imponible</span>
                   <div className="text-sm font-bold text-slate-200 mt-1">{fmtBs(baseNum)}</div>
                   <div className="text-xs text-slate-400 font-sans">{fmtUSD(baseNum)}</div>
                 </div>
 
-                {/* IVA */}
                 <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
                   <span className="block text-[11px] text-blue-400 uppercase font-sans">Monto IVA ({alicuotaNum}%)</span>
                   <div className="text-sm font-bold text-blue-300 mt-1">{fmtBs(montoIvaBs)}</div>
                   <div className="text-xs text-blue-400/80 font-sans">{fmtUSD(montoIvaBs)}</div>
                 </div>
 
-                {/* Total Factura */}
                 <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
                   <span className="block text-[11px] text-slate-300 uppercase font-sans">Monto Total Documento</span>
                   <div className="text-sm font-bold text-white mt-1">{fmtBs(montoTotalBs)}</div>
                   <div className="text-xs text-slate-300/80 font-sans">{fmtUSD(montoTotalBs)}</div>
                 </div>
 
-                {/* Retención IVA */}
                 <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
                   <span className="block text-[11px] text-amber-400 uppercase font-sans">Retención IVA ({pctRetencionIva}%)</span>
                   <div className="text-sm font-bold text-amber-300 mt-1">- {fmtBs(montoRetencionBs)}</div>
                   <div className="text-xs text-amber-400/80 font-sans">- {fmtUSD(montoRetencionBs)}</div>
                 </div>
 
-                {/* Neto a Pagar */}
                 <div className="bg-emerald-950/60 p-3 rounded-lg border border-emerald-700/60">
                   <span className="block text-[11px] text-emerald-400 uppercase font-sans font-bold">Neto a Pagar (CxP)</span>
                   <div className="text-base font-bold text-emerald-300 mt-1">{fmtBs(montoNetoPagarBs)}</div>
                   <div className="text-xs text-emerald-400/80 font-sans font-semibold">{fmtUSD(montoNetoPagarBs)}</div>
                 </div>
-
               </div>
             </div>
 
@@ -483,7 +477,6 @@ export default function SubmoduloFacturasPage() {
           </form>
         </section>
 
-        {/* TABLA DE FACTURAS REGISTRADAS */}
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-800">Documentos Registrados en CxP</h2>
