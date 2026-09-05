@@ -11,9 +11,9 @@ interface Tercero {
   razon_social: string;
   telefono?: string;
   email?: string;
+  direccion?: string;
   tipo_tercero?: string;
   porcentaje_retencion_iva?: number;
-  porcentaje_retencion_islr?: number;
 }
 
 export default function CuentasPorPagarPage() {
@@ -28,8 +28,8 @@ export default function CuentasPorPagarPage() {
     razon_social: '',
     telefono: '',
     email: '',
+    direccion: '',
     porcentaje_retencion_iva: 75,
-    porcentaje_retencion_islr: 2,
   });
 
   useEffect(() => {
@@ -62,8 +62,8 @@ export default function CuentasPorPagarPage() {
       razon_social: p.razon_social || '',
       telefono: p.telefono || '',
       email: p.email || '',
+      direccion: p.direccion || '',
       porcentaje_retencion_iva: p.porcentaje_retencion_iva ?? 75,
-      porcentaje_retencion_islr: p.porcentaje_retencion_islr ?? 2,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -75,8 +75,8 @@ export default function CuentasPorPagarPage() {
       razon_social: '',
       telefono: '',
       email: '',
+      direccion: '',
       porcentaje_retencion_iva: 75,
-      porcentaje_retencion_islr: 2,
     });
   }
 
@@ -107,9 +107,9 @@ export default function CuentasPorPagarPage() {
         razon_social: formData.razon_social.trim(),
         telefono: formData.telefono.trim(),
         email: formData.email.trim(),
+        direccion: formData.direccion.trim(),
         tipo_tercero: 'proveedor',
         porcentaje_retencion_iva: Number(formData.porcentaje_retencion_iva),
-        porcentaje_retencion_islr: Number(formData.porcentaje_retencion_islr),
       };
 
       if (editingId) {
@@ -223,7 +223,16 @@ export default function CuentasPorPagarPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
-              <div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Dirección Fiscal</label>
+                <input
+                  placeholder="ej. Av. Francisco de Miranda, Edif. Centro, Piso 3, Oficina 32, Caracas"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+              <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">% Retención de IVA a Aplicar</label>
                 <select
                   value={formData.porcentaje_retencion_iva}
@@ -233,20 +242,6 @@ export default function CuentasPorPagarPage() {
                   <option value={75}>75% (Retención Estándar - Agente Especial)</option>
                   <option value={100}>100% (Retención Total)</option>
                   <option value={0}>0% (Sin Retención IVA)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">% Retención ISLR Sugerido</label>
-                <select
-                  value={formData.porcentaje_retencion_islr}
-                  onChange={(e) => setFormData({ ...formData, porcentaje_retencion_islr: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value={2}>2% (Servicios PJ)</option>
-                  <option value={3}>3% (Honorarios Profesionales PN)</option>
-                  <option value={1}>1% (Venta de Bienes Muebles / Mercancía PJ)</option>
-                  <option value={5}>5% (Comisiones / Arrendamiento PJ)</option>
-                  <option value={0}>0% (Sin Retención ISLR)</option>
                 </select>
               </div>
             </div>
@@ -292,10 +287,9 @@ export default function CuentasPorPagarPage() {
                 <tr>
                   <th className="p-3 pl-4">RIF / Doc. Identidad</th>
                   <th className="p-3">Razón Social / Nombre</th>
-                  <th className="p-3">Teléfono</th>
-                  <th className="p-3">Email</th>
+                  <th className="p-3">Dirección Fiscal</th>
+                  <th className="p-3">Contacto</th>
                   <th className="p-3 text-center">% Ret. IVA</th>
-                  <th className="p-3 text-center">% Ret. ISLR</th>
                   <th className="p-3 text-right pr-4">Acciones</th>
                 </tr>
               </thead>
@@ -306,16 +300,16 @@ export default function CuentasPorPagarPage() {
                       {p.numero_documento || p.rif}
                     </td>
                     <td className="p-3 font-medium text-gray-900">{p.razon_social}</td>
-                    <td className="p-3 text-gray-600">{p.telefono || '-'}</td>
-                    <td className="p-3 text-gray-600">{p.email || '-'}</td>
+                    <td className="p-3 text-gray-600 max-w-xs truncate" title={p.direccion}>
+                      {p.direccion || '-'}
+                    </td>
+                    <td className="p-3 text-gray-600">
+                      <div>{p.telefono || '-'}</div>
+                      <div className="text-xs text-gray-400">{p.email}</div>
+                    </td>
                     <td className="p-3 text-center">
                       <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                         {p.porcentaje_retencion_iva ?? 75}%
-                      </span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
-                        {p.porcentaje_retencion_islr ?? 2}%
                       </span>
                     </td>
                     <td className="p-3 text-right pr-4">
