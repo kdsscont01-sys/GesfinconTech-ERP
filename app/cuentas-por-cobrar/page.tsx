@@ -6,7 +6,8 @@ import { UserPlus, Building2, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface Tercero {
   id?: string;
-  rif: string;
+  numero_documento?: string;
+  rif?: string;
   razon_social: string;
   telefono?: string;
   email?: string;
@@ -20,7 +21,7 @@ export default function CuentasPorCobrarPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    rif: '',
+    numero_documento: '',
     razon_social: '',
     telefono: '',
     email: '',
@@ -50,13 +51,22 @@ export default function CuentasPorCobrarPage() {
     setErrorMsg(null);
 
     try {
+      const payload = {
+        numero_documento: formData.numero_documento,
+        rif: formData.numero_documento,
+        razon_social: formData.razon_social,
+        telefono: formData.telefono,
+        email: formData.email,
+        tipo_tercero: 'cliente',
+      };
+
       const { error } = await supabase
         .from('terceros')
-        .insert([{ ...formData, tipo_tercero: 'cliente' }]);
+        .insert([payload]);
 
       if (error) throw error;
 
-      setFormData({ rif: '', razon_social: '', telefono: '', email: '' });
+      setFormData({ numero_documento: '', razon_social: '', telefono: '', email: '' });
       fetchTerceros();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al guardar el cliente en Supabase.');
@@ -100,11 +110,11 @@ export default function CuentasPorCobrarPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">RIF / Cédula *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">RIF / Cédula / Doc. Identidad *</label>
                 <input
-                  placeholder="ej. J-12345678-0"
-                  value={formData.rif}
-                  onChange={(e) => setFormData({ ...formData, rif: e.target.value })}
+                  placeholder="ej. V-29511414-9 o J-12345678-0"
+                  value={formData.numero_documento}
+                  onChange={(e) => setFormData({ ...formData, numero_documento: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   required
                 />
@@ -164,8 +174,8 @@ export default function CuentasPorCobrarPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-medium">
                 <tr>
-                  <th className="p-3 pl-4">RIF</th>
-                  <th className="p-3">Razón Social</th>
+                  <th className="p-3 pl-4">Doc. Identidad / RIF</th>
+                  <th className="p-3">Razón Social / Nombre</th>
                   <th className="p-3">Teléfono</th>
                   <th className="p-3">Email</th>
                 </tr>
@@ -173,7 +183,9 @@ export default function CuentasPorCobrarPage() {
               <tbody className="divide-y divide-gray-100">
                 {terceros.map((t, idx) => (
                   <tr key={t.id || idx} className="hover:bg-gray-50 transition">
-                    <td className="p-3 pl-4 font-mono font-medium text-gray-700">{t.rif}</td>
+                    <td className="p-3 pl-4 font-mono font-medium text-gray-700">
+                      {t.numero_documento || t.rif}
+                    </td>
                     <td className="p-3 font-medium text-gray-900">{t.razon_social}</td>
                     <td className="p-3 text-gray-600">{t.telefono || '-'}</td>
                     <td className="p-3 text-gray-600">{t.email || '-'}</td>
