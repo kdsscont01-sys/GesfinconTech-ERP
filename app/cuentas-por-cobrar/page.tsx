@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { UserPlus, Building2, AlertCircle, RefreshCw } from 'lucide-react';
+import { UserPlus, Building2, AlertCircle, RefreshCw, Pencil, Trash2, X, Check } from 'lucide-react';
 
 interface Tercero {
   id?: string;
@@ -20,6 +20,7 @@ export default function CuentasPorCobrarPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     numero_documento: '',
@@ -47,6 +48,45 @@ export default function CuentasPorCobrarPage() {
     }
   }
 
+  function handleEdit(t: Tercero) {
+    if (!t.id) return;
+    setEditingId(t.id);
+    setFormData({
+      numero_documento: t.numero_documento || t.rif || '',
+      razon_social: t.razon_social || '',
+      telefono: t.telefono || '',
+      email: t.email || '',
+      porcentaje_retencion_iva: t.porcentaje_retencion_iva || 0,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleCancelEdit() {
+    setEditingId(null);
+    setFormData({
+      numero_documento: '',
+      razon_social: '',
+      telefono: '',
+      email: '',
+      porcentaje_retencion_iva: 0,
+    });
+  }
+
+  async function handleDelete(id: string, razon_social: string) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el cliente "${razon_social}"?`)) return;
+
+    setErrorMsg(null);
+    try {
+      const { error } = await supabase.from('terceros').delete().eq('id', id);
+      if (error) throw error;
+
+      if (editingId === id) handleCancelEdit();
+      fetchTerceros();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al eliminar el cliente.');
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -63,22 +103,25 @@ export default function CuentasPorCobrarPage() {
         porcentaje_retencion_iva: Number(formData.porcentaje_retencion_iva),
       };
 
-      const { error } = await supabase
-        .from('terceros')
-        .insert([payload]);
+      if (editingId) {
+        const { error } = await supabase
+          .from('terceros')
+          .update(payload)
+          .eq('id', editingId);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('terceros')
+          .insert([payload]);
 
-      setFormData({
-        numero_documento: '',
-        razon_social: '',
-        telefono: '',
-        email: '',
-        porcentaje_retencion_iva: 0,
-      });
+        if (error) throw error;
+      }
+
+      handleCancelEdit();
       fetchTerceros();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error al guardar el cliente en Supabase.');
+      setErrorMsg(err.message || 'Error al procesar la información en Supabase.');
     } finally {
       setSaving(false);
     }
@@ -115,7 +158,21 @@ export default function CuentasPorCobrarPage() {
         )}
 
         <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800">Registrar Nuevo Cliente</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {editingId ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
+            </h2>
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 border px-2 py-1 rounded"
+              >
+                <X size={14} /> Cancelar edición
+              </button>
+            )}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -171,14 +228,26 @@ export default function CuentasPorCobrarPage() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition disabled:opacity-50"
-            >
-              <UserPlus size={16} />
-              {saving ? 'Guardando...' : 'Guardar Cliente'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition disabled:opacity-50"
+              >
+                {editingId ? <Check size={16} /> : <UserPlus size={16} />}
+                {saving ? 'Guardando...' : editingId ? 'Actualizar Cliente' : 'Guardar Cliente'}
+              </button>
+
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium px-4 py-2 rounded-lg text-sm transition"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           </form>
         </section>
 
@@ -200,6 +269,7 @@ export default function CuentasPorCobrarPage() {
                   <th className="p-3">Teléfono</th>
                   <th className="p-3">Email</th>
                   <th className="p-3 text-center">% Ret. IVA</th>
+                  <th className="p-3 text-right pr-4">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -219,6 +289,24 @@ export default function CuentasPorCobrarPage() {
                       }`}>
                         {t.porcentaje_retencion_iva ?? 0}%
                       </span>
+                    </td>
+                    <td className="p-3 text-right pr-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(t)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                          title="Editar cliente"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => t.id && handleDelete(t.id, t.razon_social)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition"
+                          title="Eliminar cliente"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
