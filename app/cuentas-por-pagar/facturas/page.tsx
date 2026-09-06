@@ -19,8 +19,6 @@ import {
   Download
 } from 'lucide-react';
 import Link from 'next/link';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 interface Tercero {
   id: string;
@@ -143,99 +141,98 @@ export default function SubmoduloFacturasPage() {
   const fmtBs = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const fmtUSD = (valBs: number) => `$ ${(valBs / tasaBcvNum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  // Función para generar Reporte en PDF
+  // Función para generar Reporte nativo en PDF
   function generarReportePDF() {
     if (facturas.length === 0) {
       alert('No hay facturas registradas para generar el reporte.');
       return;
     }
 
-    try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const totalMontoBs = facturas.reduce((acc, f) => acc + (f.monto_total || 0), 0);
+    const totalRetBs = facturas.reduce((acc, f) => acc + (f.monto_retencion || 0), 0);
+    const totalNetoBs = facturas.reduce((acc, f) => acc + (f.monto_neto_pagar || 0), 0);
+    const tasaRef = facturas.length > 0 && facturas[0].tasa_bcv ? facturas[0].tasa_bcv : 36.5;
+    const totalNetoUSD = totalNetoBs / tasaRef;
 
-      doc.setFontSize(15);
-      doc.setTextColor(30, 41, 59);
-      doc.text('GESFINCONTECH ERP - REPORTE DE CUENTAS POR PAGAR (CxP)', 14, 15);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString('es-VE')} | Total Documentos: ${facturas.length}`, 14, 21);
+    const rowsHtml = facturas.map(f => `
+      <tr>
+        <td style="text-align: center;">${f.fecha_emision || ''}</td>
+        <td style="text-align: center;">${(f.tipo_documento || 'factura').replace('_', ' ').toUpperCase()}</td>
+        <td>${f.tercero?.razon_social || 'Proveedor N/A'}</td>
+        <td style="text-align: center;">${(f.tercero?.numero_documento || f.tercero?.rif || '').toUpperCase()}</td>
+        <td style="text-align: center;">${f.numero_factura || ''}</td>
+        <td style="text-align: center;">${f.numero_control || ''}</td>
+        <td style="text-align: right;">Bs. ${(f.base_imponible || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">Bs. ${(f.monto_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right;">Bs. ${(f.monto_retencion || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right; font-weight: bold; color: #047857;">Bs. ${(f.monto_neto_pagar || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right; font-weight: bold; color: #047857;">$ ${((f.monto_neto_pagar || 0) / (f.tasa_bcv || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
 
-      const totalMontoBs = facturas.reduce((acc, f) => acc + (f.monto_total || 0), 0);
-      const totalRetBs = facturas.reduce((acc, f) => acc + (f.monto_retencion || 0), 0);
-      const totalNetoBs = facturas.reduce((acc, f) => acc + (f.monto_neto_pagar || 0), 0);
-      const tasaRef = facturas.length > 0 && facturas[0].tasa_bcv ? facturas[0].tasa_bcv : 36.5;
-      const totalNetoUSD = totalNetoBs / tasaRef;
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Reporte_Cuentas_Por_Pagar_${new Date().toISOString().split('T')[0]}</title>
+        <style>
+          @page { size: landscape; margin: 10mm; }
+          body { font-family: Arial, sans-serif; padding: 15px; color: #1e293b; background: white; }
+          .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
+          .title { font-size: 16px; font-weight: bold; color: #0f172a; }
+          .subtitle { font-size: 11px; color: #64748b; margin-top: 3px; }
+          .summary { display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 15px; border-radius: 6px; font-size: 11px; margin-bottom: 15px; }
+          .summary-item strong { font-weight: 700; color: #0f172a; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; }
+          th { background-color: #1e293b; color: white; padding: 7px 5px; font-weight: bold; text-align: left; text-transform: uppercase; border: 1px solid #1e293b; }
+          td { padding: 6px 5px; border: 1px solid #cbd5e1; }
+          tr:nth-child(even) { background-color: #f8fafc; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">GESFINCONTECH ERP - REPORTE DE CUENTAS POR PAGAR (CxP)</div>
+          <div class="subtitle">Fecha de Emisión: ${new Date().toLocaleDateString('es-VE')} | Total Registros: ${facturas.length}</div>
+        </div>
+        <div class="summary">
+          <div class="summary-item">Total Facturado: <strong>Bs. ${totalMontoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</strong></div>
+          <div class="summary-item">Total Retenciones IVA: <strong>Bs. ${totalRetBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</strong></div>
+          <div class="summary-item">Neto Total a Pagar: <strong style="color: #047857;">Bs. ${totalNetoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ($ ${totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })})</strong></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center;">Fecha</th>
+              <th style="text-align: center;">Tipo</th>
+              <th>Proveedor</th>
+              <th style="text-align: center;">RIF / C.I.</th>
+              <th style="text-align: center;">N° Factura</th>
+              <th style="text-align: center;">N° Control</th>
+              <th style="text-align: right;">Base (Bs.)</th>
+              <th style="text-align: right;">Total (Bs.)</th>
+              <th style="text-align: right;">Ret. IVA (Bs.)</th>
+              <th style="text-align: right;">Neto Pagar (Bs.)</th>
+              <th style="text-align: right;">Neto ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
 
-      doc.setFontSize(9);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`Total Facturado: Bs. ${totalMontoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 14, 27);
-      doc.text(`Total Retenciones IVA: Bs. ${totalRetBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 100, 27);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Neto Total a Pagar: Bs. ${totalNetoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ($ ${totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })})`, 180, 27);
-
-      const tableData = facturas.map((f) => [
-        f.fecha_emision || '',
-        f.tipo_documento?.replace('_', ' ').toUpperCase() || 'FACTURA',
-        f.tercero?.razon_social || 'Proveedor N/A',
-        (f.tercero?.numero_documento || f.tercero?.rif || '').toUpperCase(),
-        f.numero_factura || '',
-        f.numero_control || '',
-        `Bs. ${(f.base_imponible || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-        `Bs. ${(f.monto_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-        `Bs. ${(f.monto_retencion || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-        `Bs. ${(f.monto_neto_pagar || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-        `$ ${((f.monto_neto_pagar || 0) / (f.tasa_bcv || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      ]);
-
-      autoTable(doc, {
-        startY: 32,
-        head: [[
-          'Fecha',
-          'Tipo',
-          'Proveedor',
-          'RIF / C.I.',
-          'N° Factura',
-          'N° Control',
-          'Base (Bs.)',
-          'Total (Bs.)',
-          'Ret. IVA (Bs.)',
-          'Neto Pagar (Bs.)',
-          'Neto ($)'
-        ]],
-        body: tableData,
-        theme: 'striped',
-        headStyles: {
-          fillColor: [30, 41, 59],
-          textColor: [255, 255, 255],
-          fontSize: 8,
-          fontStyle: 'bold',
-          halign: 'center',
-        },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [30, 41, 59],
-        },
-        columnStyles: {
-          0: { halign: 'center', cellWidth: 20 },
-          1: { halign: 'center', cellWidth: 18 },
-          2: { cellWidth: 45 },
-          3: { halign: 'center', cellWidth: 22 },
-          4: { halign: 'center', cellWidth: 22 },
-          5: { halign: 'center', cellWidth: 22 },
-          6: { halign: 'right', cellWidth: 25 },
-          7: { halign: 'right', cellWidth: 25 },
-          8: { halign: 'right', cellWidth: 25 },
-          9: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
-          10: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
-        },
-        margin: { top: 32, left: 14, right: 14 },
-      });
-
-      doc.save(`Reporte_Cuentas_Por_Pagar_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (err: any) {
-      alert(`Error generando el reporte PDF: ${err.message || err}`);
-    }
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   }
 
   // Función para subir archivo a Supabase Storage
