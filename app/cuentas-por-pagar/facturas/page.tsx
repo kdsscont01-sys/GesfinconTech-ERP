@@ -402,14 +402,6 @@ export default function SubmoduloFacturasPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={generarReportePDF}
-              className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition cursor-pointer"
-              title="Descargar Reporte PDF"
-            >
-              <Download size={16} /> Descargar Reporte PDF
-            </button>
-            <button
-              type="button"
               onClick={loadData}
               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition border border-gray-200 bg-white cursor-pointer"
               title="Recargar datos"
@@ -722,8 +714,19 @@ export default function SubmoduloFacturasPage() {
         </section>
 
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-800">Documentos Registrados en CxP</h2>
+          <div className="p-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-800">Documentos Registrados en CxP</h2>
+              <button
+                type="button"
+                onClick={generarReportePDF}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition cursor-pointer"
+                title="Descargar Reporte PDF"
+              >
+                <Download size={14} /> Descargar PDF
+              </button>
+            </div>
+
             <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
               Registros: {facturas.length}
             </span>
