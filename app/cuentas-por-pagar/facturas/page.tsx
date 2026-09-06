@@ -9,7 +9,13 @@ import {
   RefreshCw, 
   PlusCircle, 
   DollarSign, 
-  CheckCircle2 
+  CheckCircle2,
+  Paperclip,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  XCircle,
+  UploadCloud
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,7 +29,7 @@ interface Tercero {
 }
 
 interface FacturaCompra {
-  id?: string;
+  id: string;
   tercero_id?: string;
   tercero?: Tercero;
   tipo_documento: string;
@@ -43,6 +49,7 @@ interface FacturaCompra {
   monto_retencion: number;
   monto_neto_pagar: number;
   estatus_pago?: string;
+  comprobante_url?: string;
 }
 
 export default function SubmoduloFacturasPage() {
@@ -52,6 +59,11 @@ export default function SubmoduloFacturasPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Estados para Edición y Archivo
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [currentComprobanteUrl, setCurrentComprobanteUrl] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     tipo_documento: 'factura',
@@ -128,6 +140,24 @@ export default function SubmoduloFacturasPage() {
   const fmtBs = (val: number) => `Bs. ${val.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const fmtUSD = (valBs: number) => `$ ${(valBs / tasaBcvNum).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  // Función para subir archivo a Supabase Storage
+  async function handleFileUpload(file: File): Promise<string | null> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+    const filePath = `facturas_compras/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('facturas')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw new Error(`Error al subir imagen/PDF: ${uploadError.message}`);
+    }
+
+    const { data } = supabase.storage.from('facturas').getPublicUrl(filePath);
+    return data.publicUrl;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSuccessMsg(null);
@@ -140,6 +170,13 @@ export default function SubmoduloFacturasPage() {
 
     setSaving(true);
     try {
+      let finalComprobanteUrl = currentComprobanteUrl;
+
+      // Subir archivo nuevo si fue seleccionado
+      if (selectedFile) {
+        finalComprobanteUrl = await handleFileUpload(selectedFile);
+      }
+
       const payload = {
         tipo_documento: form.tipo_documento,
         tercero_id: form.proveedor_id,
@@ -159,37 +196,89 @@ export default function SubmoduloFacturasPage() {
         monto_retencion: montoRetencionBs,
         monto_neto_pagar: montoNetoPagarBs,
         estatus_pago: 'pendiente',
+        comprobante_url: finalComprobanteUrl,
       };
 
-      const { error } = await supabase.from('compras').insert([payload]);
+      if (editingId) {
+        // Actualizar registro existente
+        const { error } = await supabase
+          .from('compras')
+          .update(payload)
+          .eq('id', editingId);
 
-      if (error) {
-        throw new Error(`Error en Supabase: ${error.message}`);
+        if (error) throw new Error(`Error al actualizar: ${error.message}`);
+        setSuccessMsg('¡Factura actualizada con éxito!');
+      } else {
+        // Crear nuevo registro
+        const { error } = await supabase.from('compras').insert([payload]);
+
+        if (error) throw new Error(`Error en Supabase: ${error.message}`);
+        setSuccessMsg('¡Factura registrada exitosamente!');
       }
 
-      setSuccessMsg('¡Factura guardada e ingresada al Libro de Compras con éxito!');
-      
-      setForm({
-        tipo_documento: 'factura',
-        proveedor_id: '',
-        numero_factura: '',
-        numero_control: '',
-        numero_nota_afectada: '',
-        numero_planilla_importacion: '',
-        fecha_emision: new Date().toISOString().split('T')[0],
-        fecha_vencimiento: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-        tasa_bcv: 36.50,
-        monto_exento: 0,
-        base_imponible: 0,
-        alicuota_iva: 16,
-      });
-
+      resetForm();
       await loadData();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error inesperado al guardar.');
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleEdit(factura: FacturaCompra) {
+    setEditingId(factura.id);
+    setCurrentComprobanteUrl(factura.comprobante_url || null);
+    setSelectedFile(null);
+    setForm({
+      tipo_documento: factura.tipo_documento || 'factura',
+      proveedor_id: factura.tercero_id || '',
+      numero_factura: factura.numero_factura || '',
+      numero_control: factura.numero_control || '',
+      numero_nota_afectada: factura.numero_nota_afectada || '',
+      numero_planilla_importacion: factura.numero_planilla_importacion || '',
+      fecha_emision: factura.fecha_emision || new Date().toISOString().split('T')[0],
+      fecha_vencimiento: factura.fecha_vencimiento || new Date().toISOString().split('T')[0],
+      tasa_bcv: factura.tasa_bcv || 36.50,
+      monto_exento: factura.monto_exento || 0,
+      base_imponible: factura.base_imponible || 0,
+      alicuota_iva: factura.alicuota_iva || 16,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleDelete(id: string, nroFactura: string) {
+    if (!confirm(`¿Estás seguro de eliminar la factura N° ${nroFactura}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('compras').delete().eq('id', id);
+      if (error) throw error;
+      setSuccessMsg(`Factura N° ${nroFactura} eliminada correctamente.`);
+      await loadData();
+    } catch (err: any) {
+      setErrorMsg(`Error al eliminar: ${err.message}`);
+    }
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setSelectedFile(null);
+    setCurrentComprobanteUrl(null);
+    setForm({
+      tipo_documento: 'factura',
+      proveedor_id: '',
+      numero_factura: '',
+      numero_control: '',
+      numero_nota_afectada: '',
+      numero_planilla_importacion: '',
+      fecha_emision: new Date().toISOString().split('T')[0],
+      fecha_vencimiento: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      tasa_bcv: 36.50,
+      monto_exento: 0,
+      base_imponible: 0,
+      alicuota_iva: 16,
+    });
   }
 
   return (
@@ -203,15 +292,15 @@ export default function SubmoduloFacturasPage() {
                 href="/cuentas-por-pagar"
                 className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium"
               >
-                <ArrowLeft size={14} /> Volver a Proveedores
+                <ArrowLeft size={14} /> Volver a Cuentas por Pagar
               </Link>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <FileText className="text-blue-600" size={28} />
-              Sub-módulo: Facturas y Comprobantes de Compra
+              Registro y Control de Facturas de Proveedores
             </h1>
             <p className="text-sm text-gray-500">
-              Registro fiscal de compras, notas de crédito/débito y retenciones (Prov. 0071)
+              Gestión operativa de cuentas por pagar y digitalización de comprobantes
             </p>
           </div>
 
@@ -240,12 +329,29 @@ export default function SubmoduloFacturasPage() {
 
         <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
           <div className="border-b pb-3 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Cargar Documento de Compra / Gastos
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              {editingId ? (
+                <>
+                  <Pencil className="text-amber-500" size={20} />
+                  Editando Factura de Compra
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="text-blue-600" size={20} />
+                  Cargar Documento de Compra / Gastos
+                </>
+              )}
             </h2>
-            <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold border border-blue-200">
-              SENIAT Prov. 0071
-            </span>
+
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg font-medium flex items-center gap-1 transition"
+              >
+                <XCircle size={14} /> Cancelar Edición
+              </button>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -305,7 +411,7 @@ export default function SubmoduloFacturasPage() {
 
             <div>
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-                Identificación del Comprobante Fiscal
+                Identificación del Comprobante
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
@@ -320,9 +426,7 @@ export default function SubmoduloFacturasPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    N° Control * <span className="text-blue-600 text-[10px]">(SENIAT)</span>
-                  </label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">N° Control *</label>
                   <input
                     placeholder="ej. 00-001234"
                     value={form.numero_control}
@@ -373,6 +477,28 @@ export default function SubmoduloFacturasPage() {
                     required
                   />
                 </div>
+
+                {/* Adjuntar Archivo Digital (PDF / Imagen) */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+                    <Paperclip size={14} className="text-blue-600" />
+                    Adjuntar Factura Digitalizada (PDF, JPG, PNG)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-lg bg-white"
+                  />
+                  {currentComprobanteUrl && !selectedFile && (
+                    <div className="mt-1 text-[11px] text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Archivo adjunto existente:
+                      <a href={currentComprobanteUrl} target="_blank" rel="noreferrer" className="underline font-semibold flex items-center gap-0.5">
+                        Ver actual <ExternalLink size={10} />
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -422,7 +548,7 @@ export default function SubmoduloFacturasPage() {
 
             <div className="bg-slate-900 text-white p-5 rounded-xl space-y-3">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                Resumen de Cierre Tributario y Financiero (Doble Moneda)
+                Resumen Financiero y Cierre de CxP (Doble Moneda)
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-mono">
@@ -464,14 +590,27 @@ export default function SubmoduloFacturasPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium px-5 py-2.5 rounded-lg text-sm transition"
+                >
+                  Cancelar
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={saving}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg flex items-center gap-2 text-sm transition shadow-sm disabled:opacity-50"
               >
-                <PlusCircle size={18} />
-                {saving ? 'Guardando...' : 'Registrar en Libro de Compras'}
+                {saving ? (
+                  <RefreshCw className="animate-spin" size={18} />
+                ) : (
+                  <UploadCloud size={18} />
+                )}
+                {saving ? 'Guardando...' : editingId ? 'Guardar Cambios' : 'Registrar Factura'}
               </button>
             </div>
           </form>
@@ -498,15 +637,15 @@ export default function SubmoduloFacturasPage() {
                     <th className="p-3">Proveedor</th>
                     <th className="p-3">N° Doc. / Control</th>
                     <th className="p-3 text-right">Base Imponible</th>
-                    <th className="p-3 text-right">IVA</th>
                     <th className="p-3 text-right">Monto Total</th>
-                    <th className="p-3 text-right">Ret. IVA</th>
                     <th className="p-3 text-right">Neto Pagar</th>
+                    <th className="p-3 text-center">Adjunto</th>
+                    <th className="p-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-mono">
-                  {facturas.map((f, idx) => (
-                    <tr key={f.id || idx} className="hover:bg-gray-50">
+                  {facturas.map((f) => (
+                    <tr key={f.id} className="hover:bg-gray-50">
                       <td className="p-3">
                         <span className="inline-block px-1.5 py-0.5 text-[10px] uppercase font-sans font-bold rounded bg-slate-100 text-slate-700 mb-1">
                           {f.tipo_documento?.replace('_', ' ') || 'Factura'}
@@ -524,21 +663,50 @@ export default function SubmoduloFacturasPage() {
                         <div>Bs. {f.base_imponible?.toFixed(2)}</div>
                         <div className="text-[10px] text-gray-400">$ {(f.base_imponible / (f.tasa_bcv || 1)).toFixed(2)}</div>
                       </td>
-                      <td className="p-3 text-right">
-                        <div>Bs. {f.monto_iva?.toFixed(2)}</div>
-                        <div className="text-[10px] text-gray-400">$ {(f.monto_iva / (f.tasa_bcv || 1)).toFixed(2)}</div>
-                      </td>
                       <td className="p-3 text-right font-bold text-gray-900">
                         <div>Bs. {f.monto_total?.toFixed(2)}</div>
                         <div className="text-[10px] text-gray-500 font-normal">$ {(f.monto_total / (f.tasa_bcv || 1)).toFixed(2)}</div>
                       </td>
-                      <td className="p-3 text-right text-amber-600">
-                        <div>Bs. {f.monto_retencion?.toFixed(2)}</div>
-                        <div className="text-[10px] text-amber-500/70">$ {(f.monto_retencion / (f.tasa_bcv || 1)).toFixed(2)}</div>
-                      </td>
                       <td className="p-3 text-right font-bold text-emerald-600">
                         <div>Bs. {f.monto_neto_pagar?.toFixed(2)}</div>
                         <div className="text-[10px] text-emerald-500 font-normal">$ {(f.monto_neto_pagar / (f.tasa_bcv || 1)).toFixed(2)}</div>
+                      </td>
+                      
+                      {/* Columna Adjunto */}
+                      <td className="p-3 text-center">
+                        {f.comprobante_url ? (
+                          <a
+                            href={f.comprobante_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded font-sans font-medium border border-blue-200 transition"
+                            title="Ver factura adjunta"
+                          >
+                            <Paperclip size={12} /> Ver
+                          </a>
+                        ) : (
+                          <span className="text-gray-300 text-[10px] font-sans">Sin archivo</span>
+                        )}
+                      </td>
+
+                      {/* Columna Acciones */}
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEdit(f)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition"
+                            title="Editar factura"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(f.id, f.numero_factura)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition"
+                            title="Eliminar factura"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
