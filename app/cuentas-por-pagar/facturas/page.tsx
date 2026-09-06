@@ -150,88 +150,92 @@ export default function SubmoduloFacturasPage() {
       return;
     }
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-    doc.setFontSize(15);
-    doc.setTextColor(30, 41, 59);
-    doc.text('GESFINCONTECH ERP - REPORTE DE CUENTAS POR PAGAR (CxP)', 14, 15);
+      doc.setFontSize(15);
+      doc.setTextColor(30, 41, 59);
+      doc.text('GESFINCONTECH ERP - REPORTE DE CUENTAS POR PAGAR (CxP)', 14, 15);
 
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString('es-VE')} | Total Documentos: ${facturas.length}`, 14, 21);
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString('es-VE')} | Total Documentos: ${facturas.length}`, 14, 21);
 
-    const totalMontoBs = facturas.reduce((acc, f) => acc + (f.monto_total || 0), 0);
-    const totalRetBs = facturas.reduce((acc, f) => acc + (f.monto_retencion || 0), 0);
-    const totalNetoBs = facturas.reduce((acc, f) => acc + (f.monto_neto_pagar || 0), 0);
-    const tasaRef = facturas.length > 0 && facturas[0].tasa_bcv ? facturas[0].tasa_bcv : 36.5;
-    const totalNetoUSD = totalNetoBs / tasaRef;
+      const totalMontoBs = facturas.reduce((acc, f) => acc + (f.monto_total || 0), 0);
+      const totalRetBs = facturas.reduce((acc, f) => acc + (f.monto_retencion || 0), 0);
+      const totalNetoBs = facturas.reduce((acc, f) => acc + (f.monto_neto_pagar || 0), 0);
+      const tasaRef = facturas.length > 0 && facturas[0].tasa_bcv ? facturas[0].tasa_bcv : 36.5;
+      const totalNetoUSD = totalNetoBs / tasaRef;
 
-    doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Total Facturado: Bs. ${totalMontoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 14, 27);
-    doc.text(`Total Retenciones IVA: Bs. ${totalRetBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 100, 27);
-    doc.setFont('', 'bold');
-    doc.text(`Neto Total a Pagar: Bs. ${totalNetoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ($ ${totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })})`, 180, 27);
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Total Facturado: Bs. ${totalMontoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 14, 27);
+      doc.text(`Total Retenciones IVA: Bs. ${totalRetBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 100, 27);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Neto Total a Pagar: Bs. ${totalNetoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ($ ${totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })})`, 180, 27);
 
-    const tableData = facturas.map((f) => [
-      f.fecha_emision || '',
-      f.tipo_documento?.replace('_', ' ').toUpperCase() || 'FACTURA',
-      f.tercero?.razon_social || 'Proveedor N/A',
-      (f.tercero?.numero_documento || f.tercero?.rif || '').toUpperCase(),
-      f.numero_factura || '',
-      f.numero_control || '',
-      `Bs. ${(f.base_imponible || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-      `Bs. ${(f.monto_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-      `Bs. ${(f.monto_retencion || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-      `Bs. ${(f.monto_neto_pagar || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
-      `$ ${((f.monto_neto_pagar || 0) / (f.tasa_bcv || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-    ]);
+      const tableData = facturas.map((f) => [
+        f.fecha_emision || '',
+        f.tipo_documento?.replace('_', ' ').toUpperCase() || 'FACTURA',
+        f.tercero?.razon_social || 'Proveedor N/A',
+        (f.tercero?.numero_documento || f.tercero?.rif || '').toUpperCase(),
+        f.numero_factura || '',
+        f.numero_control || '',
+        `Bs. ${(f.base_imponible || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+        `Bs. ${(f.monto_total || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+        `Bs. ${(f.monto_retencion || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+        `Bs. ${(f.monto_neto_pagar || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+        `$ ${((f.monto_neto_pagar || 0) / (f.tasa_bcv || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      ]);
 
-    autoTable(doc, {
-      startY: 32,
-      head: [[
-        'Fecha',
-        'Tipo',
-        'Proveedor',
-        'RIF / C.I.',
-        'N° Factura',
-        'N° Control',
-        'Base (Bs.)',
-        'Total (Bs.)',
-        'Ret. IVA (Bs.)',
-        'Neto Pagar (Bs.)',
-        'Neto ($)'
-      ]],
-      body: tableData,
-      theme: 'striped',
-      headStyles: {
-        fillColor: [30, 41, 59],
-        textColor: [255, 255, 255],
-        fontSize: 8,
-        fontStyle: 'bold',
-        halign: 'center',
-      },
-      bodyStyles: {
-        fontSize: 8,
-        textColor: [30, 41, 59],
-      },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 20 },
-        1: { halign: 'center', cellWidth: 18 },
-        2: { cellWidth: 45 },
-        3: { halign: 'center', cellWidth: 22 },
-        4: { halign: 'center', cellWidth: 22 },
-        5: { halign: 'center', cellWidth: 22 },
-        6: { halign: 'right', cellWidth: 25 },
-        7: { halign: 'right', cellWidth: 25 },
-        8: { halign: 'right', cellWidth: 25 },
-        9: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
-        10: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
-      },
-      margin: { top: 32, left: 14, right: 14 },
-    });
+      autoTable(doc, {
+        startY: 32,
+        head: [[
+          'Fecha',
+          'Tipo',
+          'Proveedor',
+          'RIF / C.I.',
+          'N° Factura',
+          'N° Control',
+          'Base (Bs.)',
+          'Total (Bs.)',
+          'Ret. IVA (Bs.)',
+          'Neto Pagar (Bs.)',
+          'Neto ($)'
+        ]],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center',
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: [30, 41, 59],
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 20 },
+          1: { halign: 'center', cellWidth: 18 },
+          2: { cellWidth: 45 },
+          3: { halign: 'center', cellWidth: 22 },
+          4: { halign: 'center', cellWidth: 22 },
+          5: { halign: 'center', cellWidth: 22 },
+          6: { halign: 'right', cellWidth: 25 },
+          7: { halign: 'right', cellWidth: 25 },
+          8: { halign: 'right', cellWidth: 25 },
+          9: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
+          10: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
+        },
+        margin: { top: 32, left: 14, right: 14 },
+      });
 
-    doc.save(`Reporte_Cuentas_Por_Pagar_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`Reporte_Cuentas_Por_Pagar_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err: any) {
+      alert(`Error generando el reporte PDF: ${err.message || err}`);
+    }
   }
 
   // Función para subir archivo a Supabase Storage
@@ -311,7 +315,7 @@ export default function SubmoduloFacturasPage() {
       await loadData();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error inesperado al guardar.');
-    } fontally {
+    } finally {
       setSaving(false);
     }
   }
@@ -397,15 +401,17 @@ export default function SubmoduloFacturasPage() {
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={generarReportePDF}
-              className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+              className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition cursor-pointer"
               title="Descargar Reporte PDF"
             >
               <Download size={16} /> Descargar Reporte PDF
             </button>
             <button
+              type="button"
               onClick={loadData}
-              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition border border-gray-200 bg-white"
+              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition border border-gray-200 bg-white cursor-pointer"
               title="Recargar datos"
             >
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
@@ -790,15 +796,17 @@ export default function SubmoduloFacturasPage() {
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
+                            type="button"
                             onClick={() => handleEdit(f)}
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition"
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded transition cursor-pointer"
                             title="Editar factura"
                           >
                             <Pencil size={15} />
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDelete(f.id, f.numero_factura)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition"
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
                             title="Eliminar factura"
                           >
                             <Trash2 size={15} />
